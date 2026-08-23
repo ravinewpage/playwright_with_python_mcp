@@ -196,6 +196,34 @@ cancel-order path) — for pure practice, prefer a site with a sandbox/test
 mode, or adapt the scenario to stop before "place order" (the codebase
 supports this trivially: just don't call `checkout.click_place_order()`).
 
+## 3.1 Known limitation: Kohls.com blocks automated sign-in
+
+`tests/test_kohls_flow.py` and `tests/test_debug_open_and_sign_in.py` do
+**not currently run end-to-end against the live site.** Debugging the
+login step (see git history for the walkthrough) traced the failure to
+Kohls' edge security: navigating to the sign-in page with an automated
+Playwright browser returns an **"Access Denied"** page served from
+`errors.edgesuite.net` — Akamai Bot Manager (or an equivalent WAF)
+blocking the request before the real login form ever loads. This was
+confirmed independently of Playwright (a second, unrelated browser session
+hit the identical block), so it's a site-level control keying off
+automation signals, not a selector bug in `pages/login_page.py`.
+
+**This project does not attempt to work around it.** Fingerprint-spoofing/
+stealth plugins, disguising `navigator.webdriver` and other automation
+signals, IP rotation, etc. would mean actively circumventing a security
+control Kohls deliberately deployed — that's true regardless of whether
+it's your own account, and isn't something this repo implements or
+recommends.
+
+**What still works:** every step through "Sign In" click (homepage load →
+Sign In → lands on `myaccount/signin.jsp`) is verified working. The Page
+Object Model, self-healing locators, MCP-only Postgres logging,
+`test_assertions` auditing, and the pause-for-secrets hard constraints are
+all real, tested infrastructure — see §4 for how to point this at a site
+without aggressive bot-blocking on login, which is the practical way to
+actually exercise the full flow.
+
 ## 4. What to do with this repo
 
 If you're using this as a personal practice project:
@@ -207,11 +235,13 @@ If you're using this as a personal practice project:
    size) against `tests/test_kohls_flow.py` to see how a POM class and its
    test caller divide responsibility: the page object knows *how* to do
    something on that page; the test knows *what* to do and in what order.
-3. **Swap the target site.** The pattern (candidate-locator lists,
-   pause-for-secrets hooks, MCP-logged API capture) generalizes to any
-   site. Try retargeting `pages/` at a site you actually have a sandbox
-   account for, and keep the same hard-constraint discipline from §1.3 —
-   it's a good habit, not Kohls-specific.
+3. **Swap the target site (recommended first step, given §3.1).** The
+   pattern (candidate-locator lists, pause-for-secrets hooks, MCP-logged
+   API capture) generalizes to any site. Retarget `pages/` at a site
+   without aggressive bot-blocking on login — a sandbox/demo shopping
+   site (e.g. `saucedemo.com`) is a good choice for actually exercising
+   the full flow end-to-end. Keep the same hard-constraint discipline
+   from §1.3 regardless of target — it's a good habit, not Kohls-specific.
 4. **Break something on purpose to see self-healing catch it.** Change one
    candidate's selector in a page object to something that won't match,
    rerun, and check `locator_health` in Postgres — you should see the
