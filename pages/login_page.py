@@ -11,8 +11,11 @@ from .base_page import BasePage, LocatorCandidate
 
 
 class LoginPage(BasePage):
-    URL = "https://www.kohls.com/account/login.jsp"
-
+    SIGN_IN_LINK_CANDIDATES = [
+        LocatorCandidate("data-testid", lambda p: p.get_by_test_id("sign-in-link")),
+        LocatorCandidate("role+name", lambda p: p.get_by_role("link", name="Sign In", exact=False)),
+        LocatorCandidate("text", lambda p: p.get_by_text("Sign In", exact=False)),
+    ]
     EMAIL_CANDIDATES = [
         LocatorCandidate("data-testid", lambda p: p.get_by_test_id("email-input")),
         LocatorCandidate("role+label", lambda p: p.get_by_role("textbox", name="Email")),
@@ -28,8 +31,14 @@ class LoginPage(BasePage):
         LocatorCandidate("text", lambda p: p.get_by_text("Hi,", exact=False)),
     ]
 
-    def open(self) -> None:
-        self.page.goto(self.URL)
+    def open(self, base_url: str) -> None:
+        """Navigate to the Kohls.com homepage, then click "Sign In" to reach
+        the login form -- rather than assuming a login page URL, which
+        isn't something to hardcode/guess at (site structure can change,
+        and sign-in may be a modal rather than a standalone page)."""
+        self.page.goto(base_url)
+        sign_in_link = self.resolve("sign_in_link", self.SIGN_IN_LINK_CANDIDATES)
+        self.retry(lambda: sign_in_link.first.click())
 
     def fill_email(self, email: str) -> None:
         field = self.resolve("login_email", self.EMAIL_CANDIDATES)

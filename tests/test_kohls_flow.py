@@ -25,109 +25,102 @@ from pages.product_page import ProductPage
 from pages.search_page import SearchPage
 from pages.track_order_page import TrackOrderPage
 
-FAILING_EMAIL = "ravinderjambulatg@gmail.com"
-REAL_EMAIL = "ravinderreddyap@gmail.com"
-SEARCH_QUERY = "adidas running shoes men"
-PRODUCT_NAME = "adidas X_PLR Path Men's Running Shoes"
-SIZE = "9.5"
-MAX_PRODUCT_PRICE = 40.0
-MAX_CART_SUBTOTAL = 50.0
-
-# Pause after each step so a human watching the browser can actually see
-# what happened, instead of the suite flying through the UI. Pure viewing
-# aid -- not a wait for page state, which every page object already
-# handles via explicit Playwright waits (see base_page.py).
-STEP_VIEW_DELAY_MS = 5000
+def _pause_for_viewing(page, scenario_data) -> None:
+    """Pause after each step so a human watching the browser can actually
+    see what happened, instead of the suite flying through the UI. Pure
+    viewing aid -- not a wait for page state, which every page object
+    already handles via explicit Playwright waits (see base_page.py)."""
+    page.wait_for_timeout(scenario_data.step_view_delay_ms)
 
 
-def _pause_for_viewing(page) -> None:
-    page.wait_for_timeout(STEP_VIEW_DELAY_MS)
-
-
-def test_kohls_end_to_end(browser_page, db_logger, run_id):
+def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_data):
     page, network_log = browser_page
 
     # Step 1: deliberately-failing login -- direct assertion, no self-healing/retry.
     login = LoginPage(page, db_logger=db_logger, run_id=run_id)
-    login.open()
-    login.fill_email(FAILING_EMAIL)
+    login.open(kohls_urls.base)
+    login.fill_email(scenario_data.failing_email)
     login.wait_for_manual_password_entry(
-        f"Login attempt 1/2 ({FAILING_EMAIL}) -- type password '12345678' and submit "
-        "to exercise the failing-login case."
+        f"Login attempt 1/2 ({scenario_data.failing_email}) -- type the intentionally-wrong "
+        "password and submit, to exercise the failing-login case."
     )
     assert login.assert_login_failed(), "Expected login to fail for the deliberately-wrong credentials"
-    db_logger.log_login_attempt(run_id, FAILING_EMAIL, "fail")
+    db_logger.log_login_attempt(run_id, scenario_data.failing_email, "fail")
     capture_step_apis(network_log, db_logger, run_id, "login_fail")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 2: real login.
-    login.open()
-    login.fill_email(REAL_EMAIL)
+    login.open(kohls_urls.base)
+    login.fill_email(scenario_data.real_email)
     login.wait_for_manual_password_entry(
-        f"Login attempt 2/2 ({REAL_EMAIL}) -- type the real password and submit."
+        f"Login attempt 2/2 ({scenario_data.real_email}) -- type the real password and submit."
     )
     assert login.assert_login_succeeded(), "Expected login to succeed with the real account"
-    db_logger.log_login_attempt(run_id, REAL_EMAIL, "success")
+    db_logger.log_login_attempt(run_id, scenario_data.real_email, "success")
     capture_step_apis(network_log, db_logger, run_id, "login_success")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 3: search.
     search = SearchPage(page, db_logger=db_logger, run_id=run_id)
-    search.search(SEARCH_QUERY)
+    search.search(scenario_data.search_query)
     capture_step_apis(network_log, db_logger, run_id, "search")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 4: open product, add to cart.
-    search.open_product_by_name(PRODUCT_NAME)
+    search.open_product_by_name(scenario_data.product_name)
     capture_step_apis(network_log, db_logger, run_id, "open_product")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 5: full product details + price check.
     product = ProductPage(page, db_logger=db_logger, run_id=run_id)
     product.open_full_details()
     price = product.get_price()
-    assert price < MAX_PRODUCT_PRICE, f"Expected price < ${MAX_PRODUCT_PRICE}, got ${price}"
+    assert price < scenario_data.max_product_price, (
+        f"Expected price < ${scenario_data.max_product_price}, got ${price}"
+    )
     capture_step_apis(network_log, db_logger, run_id, "product_details")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 6: shipping / quantity = 1.
     product.set_quantity(1)
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 7: size + add to cart.
-    product.select_size(SIZE)
+    product.select_size(scenario_data.size)
     product.add_to_cart()
     capture_step_apis(network_log, db_logger, run_id, "add_to_cart")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 8: view cart from popup.
     cart = CartPage(page, db_logger=db_logger, run_id=run_id)
     cart.open_from_popup()
     capture_step_apis(network_log, db_logger, run_id, "view_cart")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 9: subtotal check.
     subtotal = cart.get_subtotal()
-    assert subtotal < MAX_CART_SUBTOTAL, f"Expected subtotal < ${MAX_CART_SUBTOTAL}, got ${subtotal}"
+    assert subtotal < scenario_data.max_cart_subtotal, (
+        f"Expected subtotal < ${scenario_data.max_cart_subtotal}, got ${subtotal}"
+    )
     order_row_id = db_logger.log_order(run_id, subtotal=subtotal, status="pending")
     cart.proceed_to_checkout()
     capture_step_apis(network_log, db_logger, run_id, "checkout_start")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 10: checkout fields + human-only CVV/expiry.
     checkout = CheckoutPage(page, db_logger=db_logger, run_id=run_id)
-    checkout.fill_contact_email(REAL_EMAIL)
+    checkout.fill_contact_email(scenario_data.real_email)
     checkout.wait_for_manual_card_entry(
-        "Checkout reached -- type card CVV '1234' and expiry '10/28', then submit."
+        "Checkout reached -- type the card CVV and expiry, then submit."
     )
     checkout.click_review_order()
     capture_step_apis(network_log, db_logger, run_id, "review_order")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 11: place order.
     checkout.click_place_order()
     capture_step_apis(network_log, db_logger, run_id, "place_order")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 12: confirmation.
     confirmation = OrderConfirmationPage(page, db_logger=db_logger, run_id=run_id)
@@ -135,14 +128,14 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id):
     order_id = confirmation.get_order_id()
     db_logger.update_order(order_row_id, order_id=order_id, status="placed", placed_at="now()")
     capture_step_apis(network_log, db_logger, run_id, "order_confirmation")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 13: track order.
     track = TrackOrderPage(page, db_logger=db_logger, run_id=run_id)
     track.open()
     assert track.assert_order_visible(order_id), f"Expected order {order_id} visible in Track Your Order"
     capture_step_apis(network_log, db_logger, run_id, "track_order")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     # Step 14 + 15: My Purchases -> cancel order -> confirm.
     purchases = MyPurchasesPage(page, db_logger=db_logger, run_id=run_id)
@@ -150,6 +143,6 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id):
     purchases.cancel_order(order_id)
     db_logger.update_order(order_row_id, status="cancelled", cancelled_at="now()")
     capture_step_apis(network_log, db_logger, run_id, "cancel_order")
-    _pause_for_viewing(page)
+    _pause_for_viewing(page, scenario_data)
 
     db_logger.finish_run(run_id, status="passed", notes=f"order_id={order_id}")

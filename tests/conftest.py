@@ -10,6 +10,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from config import KohlsUrls, ScenarioData  # noqa: E402
 from db_logger import DBLogger  # noqa: E402
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -23,6 +24,20 @@ def db_logger() -> DBLogger:
 @pytest.fixture(scope="session")
 def run_id(db_logger: DBLogger) -> int:
     return db_logger.start_run(test_name="kohls_end_to_end_flow")
+
+
+@pytest.fixture(scope="session")
+def kohls_urls() -> KohlsUrls:
+    """Site URLs, overridable via KOHLS_BASE_URL / KOHLS_LOGIN_URL in .env."""
+    return KohlsUrls.from_env()
+
+
+@pytest.fixture(scope="session")
+def scenario_data() -> ScenarioData:
+    """Scenario inputs (emails, search term, product, size, thresholds,
+    viewing delay), overridable via env vars -- see config.py / .env.example.
+    Never hardcode these in a page object or test body."""
+    return ScenarioData.from_env()
 
 
 @pytest.fixture()
