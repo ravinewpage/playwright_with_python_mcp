@@ -20,7 +20,14 @@ from typing import Callable
 
 from playwright.sync_api import Locator, Page, TimeoutError as PlaywrightTimeoutError
 
-CANDIDATE_TIMEOUT_MS = 3000
+import os
+
+# Verified live (2026-08-23): the kids-clothing catalog landing page renders
+# ~69,000 items and took longer than 3s to have "Little Girls" resolvable
+# even though it's real markup, present in the DOM, correctly targeted --
+# just not rendered/hydrated yet at the 3s mark on a heavy page. Raised the
+# default and made it configurable rather than special-casing one page.
+CANDIDATE_TIMEOUT_MS = int(os.environ.get("LOCATOR_TIMEOUT_MS", "8000"))
 DEFAULT_RETRY_ATTEMPTS = 2
 DEFAULT_RETRY_DELAY_MS = 500
 
