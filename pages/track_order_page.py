@@ -14,7 +14,7 @@ class TrackOrderPage(BasePage):
     def open(self) -> None:
         link = self.resolve("track_your_order_nav", self.TRACK_ORDER_NAV_CANDIDATES)
         self.retry(lambda: link.first.click())
-        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_load_state("domcontentloaded")
 
     def assert_order_visible(self, order_id: str) -> bool:
         candidates = [

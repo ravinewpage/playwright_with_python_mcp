@@ -35,8 +35,16 @@ class LoginPage(BasePage):
         """Navigate to the Kohls.com homepage, then click "Sign In" to reach
         the login form -- rather than assuming a login page URL, which
         isn't something to hardcode/guess at (site structure can change,
-        and sign-in may be a modal rather than a standalone page)."""
-        self.page.goto(base_url)
+        and sign-in may be a modal rather than a standalone page).
+
+        Uses wait_until="domcontentloaded" rather than Playwright's default
+        "load": real e-commerce pages keep loading trackers/beacons well
+        past DOMContentLoaded, so waiting for the full "load" event routinely
+        times out on sites like this. `resolve()` below already does an
+        explicit wait for the Sign In element itself, which is the actual
+        readiness signal that matters here.
+        """
+        self.page.goto(base_url, wait_until="domcontentloaded")
         sign_in_link = self.resolve("sign_in_link", self.SIGN_IN_LINK_CANDIDATES)
         self.retry(lambda: sign_in_link.first.click())
 

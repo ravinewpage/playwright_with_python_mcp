@@ -8,12 +8,32 @@ import pytest
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import config.py, db_logger.py
 
 from config import KohlsUrls, ScenarioData  # noqa: E402
 from db_logger import DBLogger  # noqa: E402
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+# Env vars every fixture below depends on, directly or via config.py.
+# Checked once, up front, so a missing DATABASE_URL fails immediately with
+# a clear message instead of surfacing as an opaque MCP connection error
+# partway through the first test.
+_REQUIRED_ENV_VARS = {
+    "DATABASE_URL": "Postgres connection string for the SQL MCP server, e.g. "
+    "postgresql://localhost/playwright_mcp",
+}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def validate_environment() -> None:
+    missing = {name: hint for name, hint in _REQUIRED_ENV_VARS.items() if not os.environ.get(name)}
+    if missing:
+        details = "\n".join(f"  {name}: {hint}" for name, hint in missing.items())
+        raise RuntimeError(
+            f"Missing required environment variable(s):\n{details}\n"
+            "Copy .env.example to .env and fill these in."
+        )
 
 
 @pytest.fixture(scope="session")
@@ -22,8 +42,17 @@ def db_logger() -> DBLogger:
 
 
 @pytest.fixture(scope="session")
-def run_id(db_logger: DBLogger) -> int:
-    return db_logger.start_run(test_name="kohls_end_to_end_flow")
+def run_id(db_logger: DBLogger):
+    """One test_runs row per pytest session, marked finished on teardown
+    even if a test raises -- so a crashed run never sits at status='running'
+    in Postgres. test_kohls_end_to_end still calls db_logger.finish_run()
+    itself on the success path to record the order ID in `notes`; this
+    teardown is the safety net for the failure path."""
+    run_id = db_logger.start_run(test_name="kohls_end_to_end_flow")
+    yield run_id
+    result = db_logger.query(f"SELECT status FROM test_runs WHERE id = {run_id}")
+    if result.get("rows", [{}])[0].get("status") == "running":
+        db_logger.finish_run(run_id, status="incomplete", notes="Session ended without an explicit finish_run call")
 
 
 @pytest.fixture(scope="session")
@@ -41,13 +70,19 @@ def scenario_data() -> ScenarioData:
 
 
 @pytest.fixture()
-def browser_page(run_id, db_logger):
+def browser_page(run_id, db_logger, request):
     """A page with network request/response capture wired up for API logging.
 
     Yields (page, network_log) where network_log is a list of dicts
     accumulating every request/response pair seen during the test, so the
     test can attribute each captured call to the step it occurred in and
-    persist it via db_logger.log_api_call.
+    persist it via db_logger.log_api_call (see tests/utils.py:capture_step_apis).
+
+    On teardown: if the test failed (via the pytest_runtest_makereport hook
+    below, which stashes the outcome on the test node), a screenshot is
+    captured before the browser closes -- automatic, so a failure is never
+    left without visual evidence just because a page object didn't call
+    BasePage.capture_failure_evidence() itself.
     """
     Path("test-results").mkdir(exist_ok=True)
     network_log: list[dict] = []
@@ -59,11 +94,21 @@ def browser_page(run_id, db_logger):
 
         pending: dict[str, dict] = {}
 
-        def on_request(request):
-            pending[request.url + request.method] = {
-                "method": request.method,
-                "url": request.url,
-                "request_payload": _safe_json(request.post_data),
+        def on_request(req):
+            # req.post_data itself can raise (Playwright tries to utf-8-decode
+            # the raw body, which fails for binary/gzip-encoded request
+            # bodies -- seen in practice on ordinary sub-resource requests,
+            # not just uploads). A network-capture bug must never take down
+            # page.goto()/clicks, so this is caught broadly and the payload
+            # just recorded as unavailable rather than crashing the test.
+            try:
+                post_data = req.post_data
+            except Exception:
+                post_data = None
+            pending[req.url + req.method] = {
+                "method": req.method,
+                "url": req.url,
+                "request_payload": _safe_json(post_data),
             }
 
         def on_response(response):
@@ -85,8 +130,23 @@ def browser_page(run_id, db_logger):
 
         yield page, network_log
 
+        failed = getattr(request.node, "rep_call", None) is not None and request.node.rep_call.failed
+        if failed:
+            page.screenshot(path=f"test-results/failure_{request.node.name}.png", full_page=True)
+
         context.close()
         browser.close()
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Stash each phase's outcome on the test item (as rep_<phase>) so the
+    browser_page fixture's teardown can check whether the test body failed
+    and screenshot accordingly -- pytest doesn't expose pass/fail to
+    fixtures any other way."""
+    outcome = yield
+    report = outcome.get_result()
+    setattr(item, f"rep_{report.when}", report)
 
 
 def _safe_json(raw: str | None):
@@ -97,19 +157,7 @@ def _safe_json(raw: str | None):
     try:
         return json.loads(raw)
     except (json.JSONDecodeError, TypeError):
+        # Not JSON -- e.g. an HTML error page or form-encoded body. Keep a
+        # truncated raw snippet rather than dropping the request entirely,
+        # so api_calls still shows *something* happened at this step.
         return {"raw": raw[:2000]}
-
-
-def capture_step_apis(network_log: list[dict], db_logger: DBLogger, run_id: int, step_name: str) -> None:
-    """Persist and clear whatever network calls have accumulated for a step."""
-    for entry in network_log:
-        db_logger.log_api_call(
-            run_id=run_id,
-            step_name=step_name,
-            method=entry["method"],
-            url=entry["url"],
-            request_payload=entry.get("request_payload"),
-            response_status=entry.get("response_status"),
-            response_payload=entry.get("response_payload"),
-        )
-    network_log.clear()

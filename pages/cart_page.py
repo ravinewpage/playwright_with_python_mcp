@@ -22,7 +22,7 @@ class CartPage(BasePage):
     def open_from_popup(self) -> None:
         link = self.resolve("view_cart_popup_link", self.VIEW_CART_POPUP_CANDIDATES)
         self.retry(lambda: link.first.click())
-        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_load_state("domcontentloaded")
 
     def get_subtotal(self) -> float:
         el = self.resolve("cart_subtotal", self.SUBTOTAL_CANDIDATES)
@@ -35,4 +35,4 @@ class CartPage(BasePage):
     def proceed_to_checkout(self) -> None:
         button = self.resolve("proceed_to_checkout", self.PROCEED_TO_CHECKOUT_CANDIDATES)
         self.retry(lambda: button.first.click())
-        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_load_state("domcontentloaded")

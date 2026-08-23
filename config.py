@@ -31,6 +31,7 @@ class ScenarioData:
     size: str
     max_product_price: float
     max_cart_subtotal: float
+    max_order_total: float
     step_view_delay_ms: int
 
     @classmethod
@@ -41,7 +42,11 @@ class ScenarioData:
             search_query=_env("KOHLS_SEARCH_QUERY", "adidas running shoes men"),
             product_name=_env("KOHLS_PRODUCT_NAME", "adidas X_PLR Path Men's Running Shoes"),
             size=_env("KOHLS_SIZE", "9.5"),
+            # Product price check, at the product-details step.
             max_product_price=float(_env("KOHLS_MAX_PRODUCT_PRICE", "40.0")),
+            # Cart subtotal check, before checkout (items only, no shipping yet).
             max_cart_subtotal=float(_env("KOHLS_MAX_CART_SUBTOTAL", "50.0")),
+            # Order total check, at checkout review (subtotal + shipping).
+            max_order_total=float(_env("KOHLS_MAX_ORDER_TOTAL", "60.0")),
             step_view_delay_ms=int(_env("STEP_VIEW_DELAY_MS", "5000")),
         )

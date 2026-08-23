@@ -50,3 +50,19 @@ CREATE TABLE IF NOT EXISTS locator_health (
     candidate_strategy TEXT NOT NULL,
     matched_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Every business-rule check performed during a run (price/subtotal/total
+-- thresholds, etc.), so the pass/fail criteria and the actual observed
+-- value are auditable after the fact -- not just asserted in Python and
+-- discarded. See config.py/ScenarioData for where the thresholds come
+-- from, and db_logger.log_assertion() for how rows land here.
+CREATE TABLE IF NOT EXISTS test_assertions (
+    id SERIAL PRIMARY KEY,
+    run_id INTEGER REFERENCES test_runs(id),
+    step_name TEXT NOT NULL,
+    assertion_name TEXT NOT NULL,
+    expected_condition TEXT NOT NULL,
+    actual_value NUMERIC(10, 2),
+    passed BOOLEAN NOT NULL,
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

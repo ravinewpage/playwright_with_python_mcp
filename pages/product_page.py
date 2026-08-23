@@ -61,4 +61,4 @@ class ProductPage(BasePage):
     def add_to_cart(self) -> None:
         button = self.resolve("add_to_cart_button", self.ADD_TO_CART_CANDIDATES)
         self.retry(lambda: button.first.click())
-        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_load_state("domcontentloaded")

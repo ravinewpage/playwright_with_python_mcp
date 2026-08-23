@@ -17,7 +17,7 @@ class SearchPage(BasePage):
         box = self.resolve("search_box", self.SEARCH_BOX_CANDIDATES)
         box.fill(query)
         box.press("Enter")
-        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_load_state("domcontentloaded")
 
     def open_product_by_name(self, product_name: str) -> None:
         candidates = [
@@ -32,4 +32,4 @@ class SearchPage(BasePage):
         ]
         link = self.resolve("product_result_link", candidates)
         self.retry(lambda: link.first.click())
-        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_load_state("domcontentloaded")

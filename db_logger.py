@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import threading
 from datetime import datetime, timezone
 from typing import Any
 
@@ -40,7 +41,32 @@ class DBLogger:
         )
 
     def _run(self, coro):
-        return asyncio.run(asyncio.wait_for(coro, timeout=_CALL_TIMEOUT_S))
+        """Run an MCP coroutine to completion from synchronous callers.
+
+        Always executes on a fresh thread with its own new event loop,
+        rather than calling asyncio.run() directly on the caller's thread.
+        This matters because Playwright's sync API (used throughout
+        pages/ and tests/conftest.py) keeps its own event loop active on
+        the calling thread -- e.g. every BasePage.resolve() call logs to
+        locator_health mid-page-interaction -- and asyncio.run() raises
+        "cannot be called from a running event loop" if one is already
+        active there. A dedicated thread sidesteps the question of
+        whether that's the case entirely.
+        """
+        result: dict[str, Any] = {}
+
+        def runner() -> None:
+            try:
+                result["value"] = asyncio.run(asyncio.wait_for(coro, timeout=_CALL_TIMEOUT_S))
+            except BaseException as exc:  # re-raised on the calling thread below
+                result["error"] = exc
+
+        thread = threading.Thread(target=runner, daemon=True)
+        thread.start()
+        thread.join()
+        if "error" in result:
+            raise result["error"]
+        return result["value"]
 
     async def _call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict:
         params = StdioServerParameters(
@@ -62,16 +88,25 @@ class DBLogger:
                     return {"raw": raw}
 
     def insert(self, table_name: str, data: dict[str, Any]) -> dict:
+        """Returns mcp-postgres's insert_data shape:
+        {"inserted_rows": int, "returning": [{...row}], "execution_time_ms": int}
+        -- note the row lives under "returning", not "rows" (that key is
+        query_data's shape -- see `query()` below). Callers that need the
+        inserted row use `result["returning"][0]`.
+        """
         return self._run(self._call_tool("insert_data", {"table_name": table_name, "data": data}))
 
     def query(self, sql: str) -> dict:
+        """Returns mcp-postgres's query_data shape:
+        {"rows": [{...}], "rowCount": int, "execution_time_ms": int}
+        """
         return self._run(self._call_tool("query_data", {"query": sql}))
 
     # -- Convenience wrappers for this project's schema --------------------
 
     def start_run(self, test_name: str) -> int:
         result = self.insert("test_runs", {"test_name": test_name, "status": "running"})
-        return result["rows"][0]["id"]
+        return result["returning"][0]["id"]
 
     def finish_run(self, run_id: int, status: str, notes: str | None = None) -> None:
         self._run(
@@ -137,7 +172,7 @@ class DBLogger:
                 "cancelled_at": cancelled_at,
             },
         )
-        return result["rows"][0]["id"]
+        return result["returning"][0]["id"]
 
     def update_order(self, order_row_id: int, **fields: Any) -> None:
         if not fields:
@@ -164,5 +199,34 @@ class DBLogger:
                 "element_name": element_name,
                 "candidate_index": candidate_index,
                 "candidate_strategy": candidate_strategy,
+            },
+        )
+
+    def log_assertion(
+        self,
+        run_id: int,
+        step_name: str,
+        assertion_name: str,
+        expected_condition: str,
+        actual_value: float | None,
+        passed: bool,
+    ) -> None:
+        """Persist one business-rule check (e.g. "product price < $40") so
+        the threshold and the observed value are auditable after the run,
+        not just asserted in Python and thrown away. Call this alongside
+        every ``assert`` in a test that checks a business rule sourced from
+        ScenarioData (see config.py) -- price/subtotal/total thresholds and
+        similar. Raises nothing on ``passed=False``; the caller's ``assert``
+        is what fails the test -- this just records what was checked.
+        """
+        self.insert(
+            "test_assertions",
+            {
+                "run_id": run_id,
+                "step_name": step_name,
+                "assertion_name": assertion_name,
+                "expected_condition": expected_condition,
+                "actual_value": actual_value,
+                "passed": passed,
             },
         )

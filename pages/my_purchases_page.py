@@ -16,7 +16,7 @@ class MyPurchasesPage(BasePage):
     def open(self) -> None:
         link = self.resolve("my_purchases_nav", self.MY_PURCHASES_NAV_CANDIDATES)
         self.retry(lambda: link.first.click())
-        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_load_state("domcontentloaded")
 
     def cancel_order(self, order_id: str) -> None:
         cancel_button_candidates = [
@@ -32,4 +32,4 @@ class MyPurchasesPage(BasePage):
 
         confirm_button = self.resolve("cancel_order_confirm", self.CANCEL_ORDER_CONFIRM_CANDIDATES)
         self.retry(lambda: confirm_button.first.click())
-        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_load_state("domcontentloaded")
