@@ -31,17 +31,28 @@ class CheckoutPage(BasePage):
 
         No CVV/expiry here -- see ``wait_for_manual_card_entry`` for why
         payment fields are intentionally excluded from this method.
+
+        Candidate order follows Playwright's own recommended priority --
+        label (these are real form fields, almost certainly have
+        associated <label>s), then role, then css as a last resort. Not
+        yet live-verified (checkout requires login, currently bot-blocked,
+        see README §3.1), but ordered to this standard so whichever
+        candidate matches is the most robust one available.
         """
         field_map = {
-            "shipping_name": (name, ["#shipping-name", "input[name='name']"]),
-            "shipping_address": (address, ["#shipping-address", "input[name='address']"]),
-            "shipping_city": (city, ["#shipping-city", "input[name='city']"]),
-            "shipping_state": (state, ["#shipping-state", "select[name='state']"]),
-            "shipping_zip": (zip_code, ["#shipping-zip", "input[name='zip']"]),
+            "shipping_name": (name, "Name", ["#shipping-name", "input[name='name']"]),
+            "shipping_address": (address, "Address", ["#shipping-address", "input[name='address']"]),
+            "shipping_city": (city, "City", ["#shipping-city", "input[name='city']"]),
+            "shipping_state": (state, "State", ["#shipping-state", "select[name='state']"]),
+            "shipping_zip": (zip_code, "Zip", ["#shipping-zip", "input[name='zip']"]),
         }
-        for element_name, (value, css_selectors) in field_map.items():
+        for element_name, (value, label, css_selectors) in field_map.items():
             candidates = [
-                LocatorCandidate("css", lambda p, sels=css_selectors: p.locator(", ".join(sels)))
+                LocatorCandidate("label", lambda p, lbl=label: p.get_by_label(lbl, exact=False)),
+                LocatorCandidate(
+                    "role+name", lambda p, lbl=label: p.get_by_role("textbox", name=lbl, exact=False)
+                ),
+                LocatorCandidate("css", lambda p, sels=css_selectors: p.locator(", ".join(sels))),
             ]
             field = self.resolve(element_name, candidates)
             field.first.fill(value)
@@ -50,6 +61,8 @@ class CheckoutPage(BasePage):
         """Fill the checkout contact-email field (order confirmation goes here)."""
         candidates = [
             LocatorCandidate("data-testid", lambda p: p.get_by_test_id("contact-email")),
+            LocatorCandidate("label", lambda p: p.get_by_label("Email", exact=False)),
+            LocatorCandidate("role+name", lambda p: p.get_by_role("textbox", name="Email", exact=False)),
             LocatorCandidate("css", lambda p: p.locator("#email, input[name='email']")),
         ]
         field = self.resolve("checkout_contact_email", candidates)

@@ -16,9 +16,16 @@ class LoginPage(BasePage):
         LocatorCandidate("role+name", lambda p: p.get_by_role("link", name="Sign In", exact=False)),
         LocatorCandidate("text", lambda p: p.get_by_text("Sign In", exact=False)),
     ]
+    # Candidate order follows Playwright's own recommended priority --
+    # test-id, then role/label/placeholder (semantic, resilient to markup
+    # changes), then css as a last resort. Not yet live-verified (signin
+    # is bot-blocked, see README §3.1) but ordered to this standard so
+    # whichever candidate does match is the most robust one available.
     EMAIL_CANDIDATES = [
         LocatorCandidate("data-testid", lambda p: p.get_by_test_id("email-input")),
-        LocatorCandidate("role+label", lambda p: p.get_by_role("textbox", name="Email")),
+        LocatorCandidate("role+name", lambda p: p.get_by_role("textbox", name="Email", exact=False)),
+        LocatorCandidate("label", lambda p: p.get_by_label("Email", exact=False)),
+        LocatorCandidate("placeholder", lambda p: p.get_by_placeholder("Email", exact=False)),
         LocatorCandidate("css#id", lambda p: p.locator("#email, input[name='email']")),
     ]
     ERROR_BANNER_CANDIDATES = [

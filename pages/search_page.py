@@ -4,13 +4,17 @@ from .base_page import BasePage, LocatorCandidate
 
 
 class SearchPage(BasePage):
+    # Candidate order follows Playwright's own recommended priority:
+    # test-id (explicit, stable hook) > placeholder (verified live --
+    # "What are you looking for today?" -- a real by-placeholder locator,
+    # not guessed) > role > css as a last resort.
     SEARCH_BOX_CANDIDATES = [
         LocatorCandidate("data-testid", lambda p: p.get_by_test_id("search-input")),
+        LocatorCandidate(
+            "placeholder", lambda p: p.get_by_placeholder("What are you looking for", exact=False)
+        ),
         LocatorCandidate("role", lambda p: p.get_by_role("searchbox")),
         LocatorCandidate("css", lambda p: p.locator("#search-field, input[type='search']")),
-    ]
-    RESULT_LINK_CANDIDATES_BY_TEXT = [
-        LocatorCandidate("role+name", lambda p: p.get_by_role("link", name="")),  # filled per-call
     ]
 
     def search(self, query: str) -> None:
