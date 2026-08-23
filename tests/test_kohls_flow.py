@@ -32,15 +32,15 @@ from pages.search_page import SearchPage
 from pages.track_order_page import TrackOrderPage
 
 
-def _pause_for_viewing(page, scenario_data) -> None:
+def _pause_for_viewing(page, view_delay_ms) -> None:
     """Pause after each step so a human watching the browser can actually
     see what happened, instead of the suite flying through the UI. Pure
     viewing aid -- not a wait for page state, which every page object
     already handles via explicit Playwright waits (see base_page.py)."""
-    page.wait_for_timeout(scenario_data.step_view_delay_ms)
+    page.wait_for_timeout(view_delay_ms)
 
 
-def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_data):
+def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_data, view_delay_ms):
     page, network_log = browser_page
 
     # Step 1: deliberately-failing login. Exercises the error-message path
@@ -56,7 +56,7 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_
     assert login.assert_login_failed(), "Expected login to fail for the deliberately-wrong credentials"
     db_logger.log_login_attempt(run_id, scenario_data.failing_email, "fail")
     capture_step_apis(network_log, db_logger, run_id, "login_fail")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 2: real login, needed before anything account-specific
     # (cart/checkout/order-history) is reachable.
@@ -68,18 +68,18 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_
     assert login.assert_login_succeeded(), "Expected login to succeed with the real account"
     db_logger.log_login_attempt(run_id, scenario_data.real_email, "success")
     capture_step_apis(network_log, db_logger, run_id, "login_success")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 3: search for the target product category.
     search = SearchPage(page, db_logger=db_logger, run_id=run_id)
     search.search(scenario_data.search_query)
     capture_step_apis(network_log, db_logger, run_id, "search")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 4: open the specific product from the results.
     search.open_product_by_name(scenario_data.product_name)
     capture_step_apis(network_log, db_logger, run_id, "open_product")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 5: full product details + price check. Kohls sometimes shows a
     # different price in the detail view than the list/search results, so
@@ -92,23 +92,23 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_
         actual_value=price, threshold=scenario_data.max_product_price,
     )
     capture_step_apis(network_log, db_logger, run_id, "product_details")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 6: keep to a single item, per scenario.
     product.set_quantity(1)
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 7: select size and add to cart.
     product.select_size(scenario_data.size)
     product.add_to_cart()
     capture_step_apis(network_log, db_logger, run_id, "add_to_cart")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 8: open the cart from the add-to-cart popup to review it.
     cart = CartPage(page, db_logger=db_logger, run_id=run_id)
     cart.open_from_popup()
     capture_step_apis(network_log, db_logger, run_id, "view_cart")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 9: cart subtotal check -- item cost only, before shipping is
     # calculated at checkout. A separate, tighter order-total check
@@ -121,7 +121,7 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_
     order_row_id = db_logger.log_order(run_id, subtotal=subtotal, status="pending")
     cart.proceed_to_checkout()
     capture_step_apis(network_log, db_logger, run_id, "checkout_start")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 10: fill non-payment checkout fields, then pause for the human
     # to enter CVV/expiry (never typed by automation -- see checkout_page.py).
@@ -142,12 +142,12 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_
     )
     db_logger.update_order(order_row_id, subtotal=order_total)
     capture_step_apis(network_log, db_logger, run_id, "review_order")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 11: place the order.
     checkout.click_place_order()
     capture_step_apis(network_log, db_logger, run_id, "place_order")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 12: confirm the order went through and capture the order ID,
     # needed to look it up in the next two steps.
@@ -156,14 +156,14 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_
     order_id = confirmation.get_order_id()
     db_logger.update_order(order_row_id, order_id=order_id, status="placed", placed_at="now()")
     capture_step_apis(network_log, db_logger, run_id, "order_confirmation")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 13: confirm the order is visible in order tracking.
     track = TrackOrderPage(page, db_logger=db_logger, run_id=run_id)
     track.open()
     assert track.assert_order_visible(order_id), f"Expected order {order_id} visible in Track Your Order"
     capture_step_apis(network_log, db_logger, run_id, "track_order")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     # Step 14 + 15: cancel the order via My Purchases, so the run doesn't
     # leave a real, uncancelled order behind on the account.
@@ -172,6 +172,6 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_
     purchases.cancel_order(order_id)
     db_logger.update_order(order_row_id, status="cancelled", cancelled_at="now()")
     capture_step_apis(network_log, db_logger, run_id, "cancel_order")
-    _pause_for_viewing(page, scenario_data)
+    _pause_for_viewing(page, view_delay_ms)
 
     db_logger.finish_run(run_id, status="passed", notes=f"order_id={order_id}")

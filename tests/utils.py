@@ -60,3 +60,29 @@ def assert_and_log(
         passed=passed,
     )
     assert passed, f"{assertion_name}: expected {comparison} ${threshold:.2f}, got ${actual_value:.2f}"
+
+
+def assert_visible_and_log(
+    db_logger: DBLogger,
+    run_id: int,
+    step_name: str,
+    assertion_name: str,
+    *,
+    condition: bool,
+    description: str,
+) -> None:
+    """Same purpose as `assert_and_log`, for boolean checks (an element/text
+    is visible, a menu item exists) rather than numeric thresholds --
+    `test_assertions.actual_value` stays NULL for these rows since there's
+    no number to record, only `expected_condition` (the description) and
+    `passed`.
+    """
+    db_logger.log_assertion(
+        run_id=run_id,
+        step_name=step_name,
+        assertion_name=assertion_name,
+        expected_condition=description,
+        actual_value=None,
+        passed=condition,
+    )
+    assert condition, f"{assertion_name}: {description}"

@@ -10,7 +10,7 @@ from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # import config.py, db_logger.py
 
-from config import KohlsUrls, ScenarioData  # noqa: E402
+from config import KidsClothingScenarioData, KohlsUrls, ScenarioData  # noqa: E402
 from db_logger import DBLogger  # noqa: E402
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -63,10 +63,27 @@ def kohls_urls() -> KohlsUrls:
 
 @pytest.fixture(scope="session")
 def scenario_data() -> ScenarioData:
-    """Scenario inputs (emails, search term, product, size, thresholds,
-    viewing delay), overridable via env vars -- see config.py / .env.example.
+    """Checkout-scenario inputs (emails, search term, product, size,
+    thresholds), overridable via env vars -- see config.py / .env.example.
     Never hardcode these in a page object or test body."""
     return ScenarioData.from_env()
+
+
+@pytest.fixture(scope="session")
+def kids_clothing_scenario_data() -> KidsClothingScenarioData:
+    """Category-browse-scenario inputs (menu labels, product, color/size,
+    expected cart-popup text), overridable via env vars -- see config.py /
+    .env.example. Never hardcode these in a page object or test body."""
+    return KidsClothingScenarioData.from_env()
+
+
+@pytest.fixture(scope="session")
+def view_delay_ms() -> int:
+    """Shared viewing-pace delay (STEP_VIEW_DELAY_MS, default 5000) used by
+    every test file's `_pause_for_viewing()` helper -- not scenario-specific
+    data, so it lives in its own fixture rather than inside ScenarioData/
+    KidsClothingScenarioData."""
+    return int(os.environ.get("STEP_VIEW_DELAY_MS", "5000"))
 
 
 @pytest.fixture()
