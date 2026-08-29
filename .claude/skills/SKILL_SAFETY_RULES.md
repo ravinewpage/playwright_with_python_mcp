@@ -1,3 +1,9 @@
+---
+name: safety-rules
+description: Critical safety rules for Kohls.com test automation - never automate passwords, CVV, order placement, or hardcode config. Must follow these rules.
+user-invocable: true
+---
+
 # Safety Rules - Critical for Kohls.com Tests
 
 ## Rule 1: NEVER Automate Passwords/CVV/Expiry

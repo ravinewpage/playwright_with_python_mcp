@@ -1,3 +1,9 @@
+---
+name: kohls-page-structure
+description: Complete Kohls.com page map with key locators for all pages (HomePage, LoginPage, ProductPage, etc.), API endpoints, and dynamic elements. Use as reference when building page objects.
+user-invocable: true
+---
+
 # Kohls.com Page Structure & Locators
 
 ## Page Map

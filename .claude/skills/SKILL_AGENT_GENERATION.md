@@ -1,3 +1,9 @@
+---
+name: agent-generation
+description: Parameterized test execution, pytest class-based scenarios, parallel processing with pytest-xdist, and fixture-driven test generation. Use when running tests or adding new test scenarios.
+user-invocable: true
+---
+
 # Agent Skills - Test Generation & Parameterized Execution
 
 ## Overview

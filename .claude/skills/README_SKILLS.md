@@ -1,3 +1,9 @@
+---
+name: kohls-skills-guide
+description: Complete guide to Kohls.com test automation project - skills overview, test suites, architecture, safety guarantees, and how to run tests with smoke testing and parallel execution.
+user-invocable: true
+---
+
 # Kohls.com Test Automation - Skills & Best Practices
 
 This project demonstrates professional test automation using **Page Object Model (POM)**, **Playwright**, **Python**, and **MCP servers** for Kohls.com shopping workflows.

@@ -1,3 +1,9 @@
+---
+name: test-writing
+description: Test structure patterns, pytest fixtures, smoke markers, assertions with business thresholds, and common mistakes to avoid. Use when writing new tests or reviewing test code.
+user-invocable: true
+---
+
 # Test Writing Guidelines for Kohls.com
 
 ## Test Structure (3-Part Pattern)

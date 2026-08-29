@@ -1,3 +1,9 @@
+---
+name: locator-strategy
+description: Locator selection priority order (data-testid → role+label → CSS) for Kohls.com and best practices for resilient element selection. Use when writing or debugging page object locators.
+user-invocable: true
+---
+
 # Locator Strategy for Kohls.com
 
 ## Candidate Selection Order (Most Stable First)

@@ -1,3 +1,9 @@
+---
+name: pom-best-practices
+description: Page Object Model (POM) architecture rules, self-healing locators, and structure. Use when building or reviewing page objects for Playwright test automation.
+user-invocable: true
+---
+
 # Page Object Model (POM) Best Practices
 
 ## Core Rules
