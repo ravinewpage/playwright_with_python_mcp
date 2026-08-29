@@ -20,6 +20,8 @@ this file.
 
 from __future__ import annotations
 
+import pytest
+
 from utils import assert_and_log, capture_step_apis
 
 from pages.cart_page import CartPage
@@ -37,6 +39,7 @@ def _pause_for_viewing(page, view_delay_ms) -> None:
     page.wait_for_timeout(view_delay_ms)
 
 
+@pytest.mark.smoke
 def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_data, view_delay_ms):
     page, network_log = browser_page
 

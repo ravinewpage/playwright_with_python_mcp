@@ -15,6 +15,8 @@ run this file with its own `pytest` invocation to keep runs distinct.
 
 from __future__ import annotations
 
+import pytest
+
 from utils import assert_visible_and_log, capture_step_apis
 
 from pages.home_page import HomePage
@@ -28,6 +30,7 @@ def _pause_for_viewing(page, view_delay_ms) -> None:
     page.wait_for_timeout(view_delay_ms)
 
 
+@pytest.mark.smoke
 def test_kids_clothing_browse_and_add_to_cart(
     browser_page, db_logger, run_id, kohls_urls, kids_clothing_scenario_data, view_delay_ms
 ):
