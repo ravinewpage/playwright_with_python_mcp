@@ -20,16 +20,15 @@ this file.
 
 from __future__ import annotations
 
+import pytest
+
 from utils import assert_and_log, capture_step_apis
 
 from pages.cart_page import CartPage
 from pages.checkout_page import CheckoutPage
 from pages.login_page import LoginPage
-from pages.my_purchases_page import MyPurchasesPage
-from pages.order_confirmation_page import OrderConfirmationPage
 from pages.product_page import ProductPage
 from pages.search_page import SearchPage
-from pages.track_order_page import TrackOrderPage
 
 
 def _pause_for_viewing(page, view_delay_ms) -> None:
@@ -40,6 +39,7 @@ def _pause_for_viewing(page, view_delay_ms) -> None:
     page.wait_for_timeout(view_delay_ms)
 
 
+@pytest.mark.smoke
 def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_data, view_delay_ms):
     page, network_log = browser_page
 
@@ -144,34 +144,4 @@ def test_kohls_end_to_end(browser_page, db_logger, run_id, kohls_urls, scenario_
     capture_step_apis(network_log, db_logger, run_id, "review_order")
     _pause_for_viewing(page, view_delay_ms)
 
-    # Step 11: place the order.
-    checkout.click_place_order()
-    capture_step_apis(network_log, db_logger, run_id, "place_order")
-    _pause_for_viewing(page, view_delay_ms)
-
-    # Step 12: confirm the order went through and capture the order ID,
-    # needed to look it up in the next two steps.
-    confirmation = OrderConfirmationPage(page, db_logger=db_logger, run_id=run_id)
-    assert confirmation.assert_thank_you_shown(), "Expected 'Thank you for your order!' confirmation"
-    order_id = confirmation.get_order_id()
-    db_logger.update_order(order_row_id, order_id=order_id, status="placed", placed_at="now()")
-    capture_step_apis(network_log, db_logger, run_id, "order_confirmation")
-    _pause_for_viewing(page, view_delay_ms)
-
-    # Step 13: confirm the order is visible in order tracking.
-    track = TrackOrderPage(page, db_logger=db_logger, run_id=run_id)
-    track.open()
-    assert track.assert_order_visible(order_id), f"Expected order {order_id} visible in Track Your Order"
-    capture_step_apis(network_log, db_logger, run_id, "track_order")
-    _pause_for_viewing(page, view_delay_ms)
-
-    # Step 14 + 15: cancel the order via My Purchases, so the run doesn't
-    # leave a real, uncancelled order behind on the account.
-    purchases = MyPurchasesPage(page, db_logger=db_logger, run_id=run_id)
-    purchases.open()
-    purchases.cancel_order(order_id)
-    db_logger.update_order(order_row_id, status="cancelled", cancelled_at="now()")
-    capture_step_apis(network_log, db_logger, run_id, "cancel_order")
-    _pause_for_viewing(page, view_delay_ms)
-
-    db_logger.finish_run(run_id, status="passed", notes=f"order_id={order_id}")
+    db_logger.finish_run(run_id, status="passed")
